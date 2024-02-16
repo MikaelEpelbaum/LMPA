@@ -13,13 +13,11 @@ _ = gepetto.config.translate.gettext
 
 
 def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, response=False):
-    print("5")
-    print(response)
     if response:
         res = json.loads(response)
         # update chosen function body according to LLM response
         for func_name, func_body in called_funcs.items():
-            new_func_name = Helper.get_func_name(str(ida_hexrays.decompile(Helper.get_called_func(func_name))))
+            new_func_name = Helper.get_func_name(Helper.get_called_func(func_name))
             new_function_name = [item.get('function name', {}).get(new_func_name) for item in res]
             new_function_name = [x for x in new_function_name if x is not None]
             exa_representation = func_name.replace('sub_', '0x')
@@ -139,7 +137,7 @@ class LMPAHandler(idaapi.action_handler_t):
         params = Helper.extract_c_function_details(decompiler_output)
         called_funcs = Helper.get_called_funcs(params)
         self.v = ida_hexrays.get_widget_vdui(ctx.widget)
-        self.v.refresh_ctext()
+        # self.v.refresh_ctext()
         chosen_function_inferer_using_LLM(decompiler_output, called_funcs, self.v)
 
         return 1
