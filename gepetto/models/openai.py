@@ -48,7 +48,7 @@ class GPT(LanguageModel):
     def __str__(self):
         return self.model
 
-    def query_model(self, query, cb, additional_model_options=None):
+    def query_model(self, query, cb=None, additional_model_options=None):
         """
         Function which sends a query to gpt-3.5-turbo or gpt-4 and calls a callback when the response is available.
         Blocks until the response is received
@@ -67,8 +67,11 @@ class GPT(LanguageModel):
                 ],
                 **additional_model_options
             )
-            ida_kernwin.execute_sync(functools.partial(cb, response=response.choices[0].message.content),
-                                     ida_kernwin.MFF_WRITE)
+            if cb:
+                ida_kernwin.execute_sync(functools.partial(cb, response=response.choices[0].message.content),
+                                         ida_kernwin.MFF_WRITE)
+            else:
+                return response.choices[0].message.content
         except openai.BadRequestError as e:
             # Context length exceeded. Determine the max number of tokens we can ask for and retry.
             m = re.search(r'maximum context length is \d+ tokens, however you requested \d+ tokens', str(e))
@@ -80,8 +83,6 @@ class GPT(LanguageModel):
             print(_("{model} could not complete the request: {error}").format(model=self.model, error=str(e)))
         except Exception as e:
             print(_("General exception encountered while running the query: {error}").format(error=str(e)))
-
-    # -----------------------------------------------------------------------------
 
     def query_model_async(self, query, cb, additional_model_options=None):
         """
@@ -98,3 +99,20 @@ class GPT(LanguageModel):
         t = threading.Thread(target=self.query_model, args=[query, cb, additional_model_options])
         t.start()
 
+    # -----------------------------------------------------------------------------
+
+    def query_model_sync(self, query, additional_model_options=None):
+        """
+        Function which sends a query to {model} and returns the response when available.
+        :param query: The request to send to {model}
+        :param additional_model_options: Additional parameters used when creating the model object. Typically, for
+        OpenAI, response_format={"type": "json_object"}.
+        :return: Response from the model.
+        """
+        print("in query_model_sync")
+        if additional_model_options is None:
+            additional_model_options = {}
+        print(_("Request to {model} sent...").format(model=str(gepetto.config.model)))
+
+        # Call query_model directly instead of starting a new thread
+        return self.query_model(query, additional_model_options=additional_model_options)

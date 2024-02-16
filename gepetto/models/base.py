@@ -8,6 +8,10 @@ class LanguageModel(abc.ABC):
     def query_model_async(self, query, cb):
         pass
 
+    @abc.abstractmethod
+    def query_model_sync(self, query):
+        pass
+
 
 def get_model(model):
     """

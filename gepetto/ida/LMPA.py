@@ -14,11 +14,7 @@ _ = gepetto.config.translate.gettext
 
 def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, response=False):
     if response:
-        print("1")
-        print()
-        print(response)
         res = json.loads(response)
-        print(res)
         # update chosen function body according to LLM response
         for func_name, func_body in called_funcs.items():
             new_func_name = Helper.get_func_name(Helper.get_called_func(func_name))
@@ -59,10 +55,19 @@ def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, resp
                 " DON'T INCLUDE CHANGES OF VARIABLES CONVENTIONAL NAMINGS" \
                 " keep only high level confidence levels. RETURN ONLY MEANINGFUL CHANGES"
 
-        # interact with GPT
-        gepetto.config.model.query_model_async(
-            _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format),
-            functools.partial(called_functions_inferrer, called_funcs, chosen_func_body, view))
+        # in case the func stands alone and has no calls.
+        if not bool(called_funcs):
+            # interact with GPT
+            result = gepetto.config.model.query_model_sync(
+                _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format))
+            print(result)
+
+
+        else:
+            # interact with GPT
+            gepetto.config.model.query_model_async(
+                _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format),
+                functools.partial(called_functions_inferrer, called_funcs, chosen_func_body, view))
 
 
 def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, response):
@@ -89,7 +94,7 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, respon
         prompts.append(promt.format(comment=comment, decompiled_func=str(func_body), params=str(list(params.values())), format=requested_format))
     prompts = str(prompts)
     prompts = "IF THERE ARE MORE THAN ONE ANSWER THEN YOUR GLOBAL RETURNED ANSWER SHOULD BE A VALID JSON." \
-              "ONLY VALID JSON ARE ACCEPTABLE" + prompts
+              " ONLY VALID JSON ARE ACCEPTABLE" + prompts
     print(prompts)
 
     # interact with GPT
