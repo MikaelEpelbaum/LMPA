@@ -91,6 +91,7 @@ def rename_callback(address, view, response, retries=0):
                 if view.rename_lvar(lvars[n], names[n], True):
                     replaced.append(n)
         else:
+            print(str(function_addr))
             if ida_hexrays.rename_lvar(function_addr, n, names[n]):
                 replaced.append(n)
 

@@ -21,6 +21,11 @@ class Helper:
 
     @staticmethod
     def get_called_func(func_name):
+        exa_function = Helper.get_called_func_exa_name(func_name)
+        return str(ida_hexrays.decompile(exa_function))
+
+    @staticmethod
+    def get_called_func_exa_name(func_name):
         # repetitive because of the intermediary // attributes: thunk page
         exa_representation = func_name.replace('sub_', '0x')
         exa_function = int(exa_representation, 16)
@@ -28,7 +33,7 @@ class Helper:
         intermed = Helper.intermediary_func_extract_call(decompiled_func)
         exa_representation = intermed.replace('sub_', '0x')
         exa_function = int(exa_representation, 16)
-        return str(ida_hexrays.decompile(exa_function))
+        return exa_function
 
 
     @staticmethod

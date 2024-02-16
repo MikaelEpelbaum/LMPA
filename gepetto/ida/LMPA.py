@@ -13,11 +13,13 @@ _ = gepetto.config.translate.gettext
 
 
 def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, response=False):
+    print("5")
+    print(response)
     if response:
         res = json.loads(response)
         # update chosen function body according to LLM response
         for func_name, func_body in called_funcs.items():
-            new_func_name = Helper.get_func_name(Helper.get_called_func(func_name))
+            new_func_name = Helper.get_func_name(str(ida_hexrays.decompile(Helper.get_called_func(func_name))))
             new_function_name = [item.get('function name', {}).get(new_func_name) for item in res]
             new_function_name = [x for x in new_function_name if x is not None]
             exa_representation = func_name.replace('sub_', '0x')
@@ -58,10 +60,25 @@ def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, resp
         # in case the func stands alone and has no calls.
         if not bool(called_funcs):
             # interact with GPT
-            result = gepetto.config.model.query_model_sync(
+            response = gepetto.config.model.query_model_sync(
                 _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format))
-            print(result)
-
+            res = json.loads(response)
+            # print(response)
+            # update func name
+            original_func_name, guessed_func_name = next(iter(res['function name'].items()))
+            exa_representation = original_func_name.replace('sub_', '0x')
+            exa_function = int(exa_representation, 16)
+            idc.set_name(exa_function, guessed_func_name[0], idc.SN_NOWARN)
+            # update args and vars names
+            args_iterator = iter(res['function arguments'].items())
+            for arg in args_iterator:
+                original_arg_name, guessed_arg_name = arg
+                ida_hexrays.rename_lvar(int(exa_function), original_arg_name, guessed_arg_name[0])
+            vars_iterator = iter(res['function variables'].items())
+            for var in vars_iterator:
+                original_var_name, guessed_var_name = var
+                ida_hexrays.rename_lvar(int(exa_function), original_var_name, guessed_var_name[0])
+            view.refresh_ctext()
 
         else:
             # interact with GPT
@@ -90,7 +107,6 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, respon
 
         params = Helper.extract_c_function_details(str(func_body))
         requested_format = Helper.build_format(params)
-
         prompts.append(promt.format(comment=comment, decompiled_func=str(func_body), params=str(list(params.values())), format=requested_format))
     prompts = str(prompts)
     prompts = "IF THERE ARE MORE THAN ONE ANSWER THEN YOUR GLOBAL RETURNED ANSWER SHOULD BE A VALID JSON." \
