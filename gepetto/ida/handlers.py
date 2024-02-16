@@ -9,7 +9,6 @@ import idc
 
 import gepetto.config
 from gepetto.models.base import get_model
-from gepetto.ida.extractor import extract_c_function_details, build_format
 
 _ = gepetto.config.translate.gettext
 
@@ -130,127 +129,7 @@ class RenameHandler(idaapi.action_handler_t):
               "JSON dictionary.").format(decompiler_output=str(decompiler_output)),
             functools.partial(rename_callback, address=idaapi.get_screen_ea(), view=v),
             additional_model_options={"response_format": {"type": "json_object"}})
-
         return 1
-
-    # This action is always available.
-    def update(self, ctx):
-        return idaapi.AST_ENABLE_ALWAYS
-
-
-# -----------------------------------------------------------------------------
-from gepetto.ida.Observer import Publisher, Observer, Subscriber
-
-def LMPA(original_decompiled, response, address, publisher: Publisher, view=None):
-    # update the function name, arguments and variables according to GPT
-    res = json.loads(response)
-    # print(res)
-
-    function_addr = idaapi.get_func(address).start_ea
-    # use high confidence guess of variable and function names to rename them
-    for section, sub_section in res.items():
-        # rename function
-        if section in "function name":
-            function_name, guess_confidence = next(iter(sub_section.items()))
-            idc.set_name(address, guess_confidence[0], idc.SN_NOWARN)
-        # rename arguments and variables
-        if section in ["function arguments", "function variables"]:
-            for variable, guess_confidence in sub_section.items():
-                if variable != guess_confidence[0]:
-                    if ida_hexrays.rename_lvar(function_addr, variable, guess_confidence[0]):
-                        pass
-
-    updated_decompiled = ''
-    if view:
-        view.refresh_ctext()
-        updated_decompiled = str(ida_hexrays.decompile(idaapi.get_screen_ea()))
-
-    # publish update to Listener
-    original_function_name = next(iter(res.get('function name', {})), None)
-    publisher.publish(original_function_name, original_decompiled, updated_decompiled)
-
-    # Refresh the window to show the new names
-    if view:
-        # view.refresh_view(True)
-        view.refresh_ctext()
-
-
-def LLM_and_Observer_prepare(decompiler_output, v=None):
-    publisher = Publisher()
-    # Prepares prompt
-    params = extract_c_function_details(decompiler_output)
-    requested_format = build_format(params)
-    promt = "Can you help me guess some information for the following decompiled C function from a binary program?" \
-            " The following is the decompiled C function: \n{decompiler_output}" \
-            " In the above function, what are good names for \n{params}, respectively?" \
-            " You must follow the format \n{format} and return a valid JSON with (use double quotes only)." \
-            " DON'T INCLUDE CHANGES OF VARIABLES CONVENTIONAL NAMINGS" \
-            " keep only high level confidence levels. RETURN ONLY MEANINGFUL CHANGES"
-
-    # Defines that called function "Listen" to caller functions updates
-    # Observer design pattern implementation
-    for func_name in params['function_calls']:
-        if "sub_" in func_name:
-            s = Subscriber(func_name)
-            publisher.register_observer(s)
-
-    # interact with GPT
-    gepetto.config.model.query_model_async(
-        _(promt).format(decompiler_output=str(decompiler_output), params=str(list(params.keys())), format=requested_format),
-        functools.partial(LMPA, str(decompiler_output), address=idaapi.get_screen_ea(), publisher=publisher, view=v))
-# -----------------------------------------------------------------------------
-
-
-from gepetto.ida.extractor import c_func_dict
-
-class LMPAHandler(idaapi.action_handler_t, Publisher, Observer):
-    """
-    This handler requests new variable names from the model and updates the
-    decompiler's output.
-    """
-
-    def __init__(self):
-        idaapi.action_handler_t.__init__(self)
-
-    def activate(self, ctx):
-        decompiler_output = ida_hexrays.decompile(idaapi.get_screen_ea())
-        v = ida_hexrays.get_widget_vdui(ctx.widget)
-
-        # map known functions to their real names
-        for func in c_func_dict.keys():
-            if func in str(decompiler_output):
-                try:
-                    exa_representation = func.replace('sub_', '0x')
-                    exa_function = int(exa_representation, 16)
-                    idc.set_name(exa_function, c_func_dict[func], idc.SN_NOWARN)
-                except:
-                    continue
-
-        LLM_and_Observer_prepare(decompiler_output, v)
-
-        return 1
-
-    # def LLM_and_Observer_prepare(self, decompiler_output, v):
-    #     # Prepares prompt
-    #     params = extract_c_function_details(decompiler_output)
-    #     requested_format = build_format(params)
-    #     promt = "Can you help me guess some information for the following decompiled C function from a binary program?" \
-    #             " The following is the decompiled C function: \n{decompiler_output}" \
-    #             " In the above function, what are good names for \n{params}, respectively?" \
-    #             " You must follow the format \n{format} and return a valid JSON with (use double quotes only)." \
-    #             " DON'T INCLUDE CHANGES OF VARIABLES CONVENTIONAL NAMINGS" \
-    #             " keep only high level confidence levels. RETURN ONLY MEANINGFUL CHANGES"
-    #
-    #     # Defines that called function "Listen" to caller functions updates
-    #     # Observer design pattern implementation
-    #     for func_name in params['function_calls']:
-    #         s = Subscriber(func_name)
-    #         self.publisher.register_observer(s)
-    #
-    #     # interact with GPT
-    #     gepetto.config.model.query_model_async(
-    #         _(promt).format(decompiler_output=str(decompiler_output), params=str(list(params.keys())), format=requested_format),
-    #         functools.partial(LMPA, address=idaapi.get_screen_ea(), view=v, publisher=self.publisher))
 
     # This action is always available.
     def update(self, ctx):
