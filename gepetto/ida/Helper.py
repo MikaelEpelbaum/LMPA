@@ -2,7 +2,9 @@ import re
 import ida_hexrays
 
 class Helper:
-    c_func_dict = {"sub_4110DC": "printf", "sub_41129E": "scanf_s", "for": "for", "__CheckForDebuggerJustMyCode": "__CheckForDebuggerJustMyCode"}
+    c_func_dict = {"sub_4110DC": "printf", "sub_401020": "printf", "printf": "printf",
+                   "sub_401060": "scanf_s", "sub_41129E": "scanf_s",
+                   "for": "for", "while": "while", "__CheckForDebuggerJustMyCode": "__CheckForDebuggerJustMyCode"}
 
     @staticmethod
     def intermediary_func_extract_call(decompiled: str):
@@ -21,11 +23,21 @@ class Helper:
 
     @staticmethod
     def get_called_func(func_name):
+        print(func_name)
+        # release
         exa_function = Helper.get_called_func_exa_name(func_name)
+        # debug
+        # exa_function = Helper.get_called_func_exa_name_thunk(func_name)
         return str(ida_hexrays.decompile(exa_function))
 
     @staticmethod
     def get_called_func_exa_name(func_name):
+        exa_representation = func_name.replace('sub_', '0x')
+        exa_function = int(exa_representation, 16)
+        return exa_function
+
+    @staticmethod
+    def get_called_func_exa_name_thunk(func_name):
         # repetitive because of the intermediary // attributes: thunk page
         exa_representation = func_name.replace('sub_', '0x')
         exa_function = int(exa_representation, 16)
@@ -43,11 +55,19 @@ class Helper:
 
         # Match the pattern in the input string
         match = re.match(pattern, c_function_declaration)
-
         if match:
             return match.group(1)  # Return the first matched group (function name)
         else:
             return None  # Return None if no match found
+
+
+    @staticmethod
+    def replace_known_funcs(original_code: str):
+        new_code = original_code
+        for original_func, translated_func in Helper.c_func_dict.items():
+            new_code = new_code.replace(original_func, translated_func)
+        return new_code
+
 
 
     @staticmethod
