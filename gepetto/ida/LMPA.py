@@ -87,6 +87,7 @@ def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, c=4,
             response = gepetto.config.model.query_model_sync(
                 _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format))
             res = json.loads(response)
+            print(response)
             # update func name
             original_func_name, guessed_func_name = next(iter(res['function name'].items()))
             original_func_name = idaapi.get_screen_ea()
@@ -99,9 +100,17 @@ def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, c=4,
                 ida_hexrays.rename_lvar(original_func_name, original_arg_name, guessed_arg_name[0])
             vars_iterator = iter(res['function variables'].items())
             current_func_name = idaapi.get_func(idaapi.get_screen_ea()).start_ea
+            # TODO: make it work with all the vars not only one bug in ida?
             for var in vars_iterator:
                 original_var_name, guessed_var_name = var
-                ida_hexrays.rename_lvar(current_func_name, original_var_name, guessed_var_name[0])
+                ida_hexrays.rename_lvar(original_func_name, original_var_name, guessed_var_name[0])
+            # vars = []
+            # for var in vars_iterator:
+            #     original_var_name, guessed_var_name = var
+            #     vars.append((original_var_name, guessed_var_name[0]))
+            #     print(vars)
+            # ida_hexrays.user_lvar_modifier_t(original_func_name, vars)
+
             view.refresh_ctext()
 
         else:
