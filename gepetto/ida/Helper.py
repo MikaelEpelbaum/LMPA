@@ -23,17 +23,15 @@ class Helper:
 
     @staticmethod
     def get_called_func(func_name):
-        print(func_name)
-        # release
         exa_function = Helper.get_called_func_exa_name(func_name)
-        # debug
-        # exa_function = Helper.get_called_func_exa_name_thunk(func_name)
         return str(ida_hexrays.decompile(exa_function))
 
     @staticmethod
     def get_called_func_exa_name(func_name):
         exa_representation = func_name.replace('sub_', '0x')
         exa_function = int(exa_representation, 16)
+        if '// attributes: thunk' in str(ida_hexrays.decompile(exa_function)):
+            return Helper.get_called_func_exa_name_thunk(func_name)
         return exa_function
 
     @staticmethod
@@ -96,6 +94,9 @@ class Helper:
     def extract_c_function_details(c_function):
         returned_dic = {}
         c_function = str(c_function).replace(' __cdecl', '')
+        intermediary_func = '// attributes: thunk' in c_function
+        if intermediary_func:
+            c_function = str(c_function.replace('// attributes: thunk', ''))
 
         # Define regex patterns for different parts of the function
         func_signature_pattern = re.compile(r'^\s*(?P<return_type>[A-z_][A-z0-9_]*\s*\*?)\s+(?P<name>[A-z_][A-z0-9_]*)\s*\((?P<args>.*)\)\s*{')
@@ -109,6 +110,8 @@ class Helper:
 
         # Extract function details
         func_name = match.group('name')
+        if intermediary_func:
+            func_name = Helper.intermediary_func_extract_call(c_function)
 
         # Extract local variables
         local_vars = []
@@ -149,7 +152,6 @@ class Helper:
     def extract_function_call_variables(scope: str, func: str):
         vars = []
         occurrences = [i for i in range(len(scope)) if scope.startswith(func + "(", i)]
-        # print(scope)
         for occurrence in occurrences:
             closing = scope[occurrence:].find(")")
             vars.append(scope[occurrence + len(func) + 1: occurrence + closing])

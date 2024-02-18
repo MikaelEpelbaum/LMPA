@@ -1,11 +1,9 @@
 import functools
 import json
-import re
 
 import idaapi
 import ida_hexrays
 import idc
-import ida_funcs
 
 import gepetto.config
 from gepetto.ida.Helper import Helper
@@ -13,30 +11,45 @@ from gepetto.ida.Helper import Helper
 _ = gepetto.config.translate.gettext
 
 
-def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, response=False):
+def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, c=4, response=False):
+    if c <= 0:
+        return
+    # triggered by a response to an MLL query
     if response:
-        print('4')
+        print("1")
         print(response)
         res = json.loads(response)
         # update chosen function body according to LLM response
         for func_name, func_body in called_funcs.items():
             called_func = Helper.get_called_func(func_name)
             new_func_name = Helper.get_func_name(called_func)
-            print(new_func_name)
-            print("11")
             new_function_name = [item.get('function name', {}).get(new_func_name) for item in res]
-            print("2")
             new_function_name = [x for x in new_function_name if x is not None]
-            print("3")
             exa_representation = func_name.replace('sub_', '0x')
-            print("4")
             exa_function = int(exa_representation, 16)
-            print("5")
             idc.set_name(exa_function, new_function_name[0][0], idc.SN_NOWARN)
-            print("6")
             # update called function
         view.refresh_ctext()
-        print("9")
+
+        # update chosen function callees according to LLM response
+        # update func name
+        for func_res in res:
+            original_func_name, guessed_func_name = next(iter(func_res['function name'].items()))
+            exa_representation = original_func_name.replace('sub_', '0x')
+            exa_function = int(exa_representation, 16)
+            guessed_func_name = guessed_func_name[0]
+            idc.set_name(exa_function, guessed_func_name, idc.SN_NOWARN)
+            # update args and vars names
+            args_iterator = iter(func_res['function arguments'].items())
+            for arg in args_iterator:
+                original_arg_name, guessed_arg_name = arg
+                ida_hexrays.rename_lvar(exa_function, original_arg_name, guessed_arg_name[0])
+            vars_iterator = iter(func_res['function variables'].items())
+            for var in vars_iterator:
+                original_var_name, guessed_var_name = var
+                ida_hexrays.rename_lvar(exa_function, original_var_name, guessed_var_name[0])
+
+
 
         # Prepares prompt
         chosen_func_new_body = str(ida_hexrays.decompile(idaapi.get_screen_ea()))
@@ -52,10 +65,11 @@ def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, resp
         # interact with GPT
         gepetto.config.model.query_model_async(
             _(promt).format(decompiler_output=chosen_func_new_body, params=str(list(params.keys())), format=requested_format),
-            functools.partial(called_functions_inferrer, called_funcs, chosen_func_new_body, view))
+            functools.partial(called_functions_inferrer, called_funcs, chosen_func_new_body, view, c-1))
 
 
     else:
+        print("2")
         # Prepares prompt
         params = Helper.extract_c_function_details(chosen_func_body)
         requested_format = Helper.build_format(params)
@@ -68,46 +82,41 @@ def chosen_function_inferer_using_LLM(chosen_func_body, called_funcs, view, resp
 
         # in case the func stands alone and has no calls.
         if not bool(called_funcs):
-            print("22")
+            print("3")
             # interact with GPT
             response = gepetto.config.model.query_model_sync(
                 _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format))
             res = json.loads(response)
-            print(response)
             # update func name
             original_func_name, guessed_func_name = next(iter(res['function name'].items()))
             original_func_name = idaapi.get_screen_ea()
             guessed_func_name = guessed_func_name[0]
             idc.set_name(original_func_name, guessed_func_name, idc.SN_NOWARN)
-            # if 'sub_' in original_func_name:
-            #     exa_representation = original_func_name.replace('sub_', '0x')
-            #     exa_function = int(exa_representation, 16)
-            #     original_func_name = exa_function
-            #     idc.set_name(exa_function, guessed_func_name[0], idc.SN_NOWARN)
-
             # update args and vars names
             args_iterator = iter(res['function arguments'].items())
             for arg in args_iterator:
                 original_arg_name, guessed_arg_name = arg
-                # ida_hexrays.rename_lvar(int(exa_function), original_arg_name, guessed_arg_name[0])
                 ida_hexrays.rename_lvar(original_func_name, original_arg_name, guessed_arg_name[0])
             vars_iterator = iter(res['function variables'].items())
             current_func_name = idaapi.get_func(idaapi.get_screen_ea()).start_ea
             for var in vars_iterator:
                 original_var_name, guessed_var_name = var
-                # ida_hexrays.rename_lvar(int(exa_function), original_var_name, guessed_var_name[0])
                 ida_hexrays.rename_lvar(current_func_name, original_var_name, guessed_var_name[0])
             view.refresh_ctext()
 
         else:
+            print("4")
+            # first attempt and doesn't stand alone
             # interact with GPT
             gepetto.config.model.query_model_async(
                 _(promt).format(decompiler_output=chosen_func_body, params=str(list(params.keys())), format=requested_format),
-                functools.partial(called_functions_inferrer, called_funcs, chosen_func_body, view))
+                functools.partial(called_functions_inferrer, called_funcs, chosen_func_body, view, c-1))
 
 
-def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, response):
-    print("3")
+def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, response):
+    if c <= 0:
+        return
+    print('5')
     res = json.loads(response)
     chosen_function_name = next(iter(res.get('function name', {})), None)
     prompts = []
@@ -127,13 +136,14 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, respon
         params = Helper.extract_c_function_details(str(func_body))
         requested_format = Helper.build_format(params)
         prompts.append(promt.format(comment=comment, decompiled_func=str(func_body), params=str(list(params.values())), format=requested_format))
+
     prompts = str(prompts)
     prompts = "IF THERE ARE MORE THAN ONE ANSWER THEN YOUR GLOBAL RETURNED ANSWER SHOULD BE A VALID JSON." \
               " ONLY VALID JSON ARE ACCEPTABLE" + prompts
     print(prompts)
 
     # interact with GPT
-    gepetto.config.model.query_model_async(prompts, functools.partial(chosen_function_inferer_using_LLM, chosen_func_body, called_funcs, view))
+    gepetto.config.model.query_model_async(prompts, functools.partial(chosen_function_inferer_using_LLM, chosen_func_body, called_funcs, view, c-1))
 
 
 class LMPAHandler(idaapi.action_handler_t):
@@ -149,6 +159,7 @@ class LMPAHandler(idaapi.action_handler_t):
     def activate(self, ctx):
         decompiler_output = str(ida_hexrays.decompile(idaapi.get_screen_ea()))
         decompiler_output = Helper.replace_known_funcs(decompiler_output)
+        # renames known functions like printf, scanf etc'
         for func, name in Helper.c_func_dict.items():
             try:
                 exa_representation = func.replace('sub_', '0x')
@@ -156,12 +167,12 @@ class LMPAHandler(idaapi.action_handler_t):
                 idc.set_name(exa_function, name, idc.SN_NOWARN)
             except:
                 continue
+
         params = Helper.extract_c_function_details(decompiler_output)
-        print(params)
         called_funcs = Helper.get_called_funcs(params)
         self.v = ida_hexrays.get_widget_vdui(ctx.widget)
         # self.v.refresh_ctext()
-        chosen_function_inferer_using_LLM(decompiler_output, called_funcs, self.v)
+        chosen_function_inferer_using_LLM(decompiler_output, called_funcs, self.v, 4)
 
         return 1
 
