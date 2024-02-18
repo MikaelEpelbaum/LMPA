@@ -69,7 +69,7 @@ class GepettoPlugin(idaapi.plugin_t):
 
         # LMPA
         LMPA_action = idaapi.action_desc_t(self.LMPA_action_name,
-                                             _('LMPA Rename variables'),
+                                             _('LMPA Renamings'),
                                              LMPAHandler(),
                                              "Ctrl+Alt+L",
                                              _("Use {model} to apply LMPA").format(
