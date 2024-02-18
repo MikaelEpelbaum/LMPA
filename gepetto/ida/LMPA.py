@@ -154,6 +154,18 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
     # interact with GPT
     gepetto.config.model.query_model_async(prompts, functools.partial(chosen_function_inferer_using_LLM, chosen_func_body, called_funcs, view, c-1))
 
+# import ida_helpers
+from gepetto.ida.c_function import CFunction
+def recover_function_name_args_iterativelly(c_func: CFunction, iteration: int):
+    if iteration <= 0:
+        return
+    if c_func.isLeaf:
+        pass
+    else:
+        pass
+
+
+
 
 class LMPAHandler(idaapi.action_handler_t):
     """
@@ -166,25 +178,46 @@ class LMPAHandler(idaapi.action_handler_t):
         self.v = ''
 
     def activate(self, ctx):
-        decompiler_output = str(ida_hexrays.decompile(idaapi.get_screen_ea()))
-        decompiler_output = Helper.replace_known_funcs(decompiler_output)
-        # renames known functions like printf, scanf etc'
-        for func, name in Helper.c_func_dict.items():
-            try:
-                exa_representation = func.replace('sub_', '0x')
-                exa_function = int(exa_representation, 16)
-                idc.set_name(exa_function, name, idc.SN_NOWARN)
-            except:
-                continue
-
-        params = Helper.extract_c_function_details(decompiler_output)
-        called_funcs = Helper.get_called_funcs(params)
-        self.v = ida_hexrays.get_widget_vdui(ctx.widget)
-        # self.v.refresh_ctext()
-        chosen_function_inferer_using_LLM(decompiler_output, called_funcs, self.v, 4)
-
+        self.view = ida_hexrays.get_widget_vdui(ctx.widget)
+        c_func = CFunction(idaapi.get_screen_ea(), self.view)
+        recover_function_name_args_iterativelly(c_func, 4)
         return 1
 
     # This action is always available.
     def update(self, ctx):
         return idaapi.AST_ENABLE_ALWAYS
+
+
+# # original
+# class LMPAHandler(idaapi.action_handler_t):
+#     """
+#     This handler requests new variable names from the model and updates the
+#     decompiler's output.
+#     """
+#
+#     def __init__(self):
+#         idaapi.action_handler_t.__init__(self)
+#         self.v = ''
+#
+#     def activate(self, ctx):
+#         decompiler_output = str(ida_hexrays.decompile(idaapi.get_screen_ea()))
+#         decompiler_output = Helper.replace_known_funcs(decompiler_output)
+#         # renames known functions like printf, scanf etc'
+#         for func, name in Helper.c_func_dict.items():
+#             try:
+#                 exa_representation = func.replace('sub_', '0x')
+#                 exa_function = int(exa_representation, 16)
+#                 idc.set_name(exa_function, name, idc.SN_NOWARN)
+#             except:
+#                 continue
+#
+#         params = Helper.extract_c_function_details(decompiler_output)
+#         called_funcs = Helper.get_called_funcs(params)
+#         self.v = ida_hexrays.get_widget_vdui(ctx.widget)
+#         chosen_function_inferer_using_LLM(decompiler_output, called_funcs, self.v, 4)
+#
+#         return 1
+#
+#     # This action is always available.
+#     def update(self, ctx):
+#         return idaapi.AST_ENABLE_ALWAYS
