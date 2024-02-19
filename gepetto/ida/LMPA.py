@@ -156,7 +156,7 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
 
 
 # import ida_helpers
-from gepetto.ida.c_function import CFunction
+from gepetto.ida.c_function import CFunction, c_func_dict
 from gepetto.ida.Prompts import chosen_func_prompt, comment_prompt
 from gepetto.ida.ida_helpers import get_format
 
@@ -178,20 +178,23 @@ def recover_function_name_args_iteratively(c_func, iterations: int):
             # interact with GPT
             response = gepetto.config.model.query_model_sync(
                 _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
-            #     parse response and update changes apply to itself
+            # parse response and update changes apply to itself
             apply_changes(c_func, response)
 
 
             #secondary functions (called within the main function)
             for called_function, args in c_func.calls.items():
-                params = [c_func.name] + c_func.arguments + c_func.variables
-                prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
-                comment = comment_prompt.format(function_name=called_function, variables=args)
-                # interact with GPT
-                response = gepetto.config.model.query_model_sync(comment + prompt)
-            #     parse response and update changes apply to itself and to caller func
-            apply_changes(c_func, response)
-            update_func()
+                ida_hexrays.decompile(exa_function)
+            #     params = [c_func.name] + c_func.arguments + c_func.variables
+            #     prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
+            #     comment = comment_prompt.format(function_name=called_function, variables=args)
+            #     # interact with GPT
+            #     response = gepetto.config.model.query_model_sync(comment + prompt)
+            #     print("IN SEC")
+            #     print(response)
+            # #     parse response and update changes apply to itself and to caller func
+            # apply_changes(c_func, response)
+            # update_func()
 
 
 
@@ -216,7 +219,20 @@ def apply_changes(c_func, LLM_result):
     for var in vars_iterator:
         original_var_name, guessed_var_name = var
         ida_hexrays.rename_lvar(exa_function, original_var_name, guessed_var_name[0])
+    # update called funcs
+    for called, guessed_call_name in response['function calls'].items():
+        if called in c_func_dict.keys():
+            continue
+        try:
+            exa_representation = called.replace('sub_', '0x')
+            print(exa_representation)
+            exa_function = int(exa_representation, 16)
+            idc.set_name(exa_function, guessed_call_name[0], idc.SN_NOWARN)
+        except:
+            # if it ends here two possibilities 'sub_' not in called
+            pass
     c_func.view.refresh_view(True)
+    c_func.load_func()
 
 def update_func():
     pass
@@ -235,7 +251,7 @@ class LMPAHandler(idaapi.action_handler_t):
     def activate(self, ctx):
         self.view = ida_hexrays.get_widget_vdui(ctx.widget)
         c_func = CFunction(idaapi.get_screen_ea(), self.view)
-        recover_function_name_args_iteratively(c_func, 4)
+        recover_function_name_args_iteratively(c_func, 1)
         return 1
 
     # This action is always available.

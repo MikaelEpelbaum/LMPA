@@ -14,17 +14,27 @@ class CFunction:
     def __init__(self, effective_address: int, view: vdui_t):
         self.ea = effective_address
         self.view = view
+        self.load_func()
+        # self.name = ida_funcs.get_func_name(self.ea)
+        # self.arguments_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).arguments)
+        # self.arguments = [arg.name for arg in self.arguments_address]
+        # self.variables_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).lvars)
+        # self.variables = [var.name for var in self.variables_address if not var.is_arg_var]
+        # body = str(ida_hexrays.decompile_func(ida_funcs.get_func(self.ea), None))
+        # self.calls = self.find_function_calls_with_args()
+        self.body = self.rename_known_funcs(self.body)
+        self.isLeaf = False
+        if len(self.calls) == 0:
+            self.isLeaf = True
+
+    def load_func(self):
         self.name = ida_funcs.get_func_name(self.ea)
         self.arguments_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).arguments)
         self.arguments = [arg.name for arg in self.arguments_address]
         self.variables_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).lvars)
         self.variables = [var.name for var in self.variables_address if not var.is_arg_var]
-        body = str(ida_hexrays.decompile_func(ida_funcs.get_func(effective_address), None))
-        self.body = self.rename_known_funcs(body)
+        self.body = str(ida_hexrays.decompile_func(ida_funcs.get_func(self.ea), None))
         self.calls = self.find_function_calls_with_args()
-        self.isLeaf = False
-        if len(self.calls) == 0:
-            self.isLeaf = True
 
     @staticmethod
     def rename_known_funcs(body):
