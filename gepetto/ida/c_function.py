@@ -1,7 +1,6 @@
 import ida_hexrays
 from ida_hexrays import vdui_t
 import ida_funcs
-import idaapi
 import idc
 import re
 
