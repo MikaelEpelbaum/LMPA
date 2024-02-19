@@ -156,18 +156,20 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
 
 
 # import ida_helpers
-from gepetto.ida.c_function import CFunction
+# from gepetto.ida.c_function import CFunction
 from gepetto.ida.Prompts import chosen_func_prompt, comment_prompt
 from gepetto.ida.ida_helpers import get_format
 
 
-def recover_function_name_args_iteratively(c_func: CFunction, iterations: int):
+def recover_function_name_args_iteratively(c_func, iterations: int):
     if c_func.isLeaf:
         params = [c_func.name] + c_func.arguments + c_func.variables
         # interact with GPT
         response = gepetto.config.model.query_model_sync(
             _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
-    #     parse response and update changes
+        # parse response and update changes apply to itself
+        apply_changes(c_func, response)
+
     else:
         # need to update stopping condition, gradient descent like (till convergence)
         while(iterations >= 0):
@@ -176,20 +178,46 @@ def recover_function_name_args_iteratively(c_func: CFunction, iterations: int):
             # interact with GPT
             response = gepetto.config.model.query_model_sync(
                 _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
+            #     parse response and update changes apply to itself
+            apply_changes(c_func, response)
+
 
 
             #secondary functions
-            params = [c_func.name] + c_func.arguments + c_func.variables
-            prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
             for called_function, args in c_func.calls.items():
+                params = [c_func.name] + c_func.arguments + c_func.variables
+                prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
                 comment = comment_prompt.format(function_name=called_function, variables=args)
                 # interact with GPT
                 response = gepetto.config.model.query_model_sync(comment + prompt)
+            #     parse response and update changes apply to itself and to caller func
+            apply_changes(c_func, response)
+            update_func()
 
 
 
             iterations-=1
 
+def apply_changes(c_func, LLM_result):
+    response = json.loads(LLM_result)
+    for func_res in response:
+        original_func_name, guessed_func_name = next(iter(func_res['function name'].items()))
+        exa_representation = original_func_name.replace('sub_', '0x')
+        exa_function = int(exa_representation, 16)
+        guessed_func_name = guessed_func_name[0]
+        idc.set_name(exa_function, guessed_func_name, idc.SN_NOWARN)
+        # update args and vars names
+        args_iterator = iter(func_res['function arguments'].items())
+        for arg in args_iterator:
+            original_arg_name, guessed_arg_name = arg
+            ida_hexrays.rename_lvar(exa_function, original_arg_name, guessed_arg_name[0])
+        vars_iterator = iter(func_res['function variables'].items())
+        for var in vars_iterator:
+            original_var_name, guessed_var_name = var
+            ida_hexrays.rename_lvar(exa_function, original_var_name, guessed_var_name[0])
+
+def update_func():
+    pass
 
 
 class LMPAHandler(idaapi.action_handler_t):
