@@ -1,3 +1,4 @@
+for more infos look at https://github.com/JusticeRage/Gepetto/tree/main/gepetto
 ## Setup
 
 Simply drop this script (as well as the `gepetto/` folder) into your IDA plugins folder (`$IDAUSR/plugins`). 
@@ -10,5 +11,3 @@ Finally, with the corresponding interpreter, simply run:
 
 ```
 [/path/to/python] -m pip install -r requirements.txt
-
-for more data look at https://github.com/JusticeRage/Gepetto/tree/main/gepetto
