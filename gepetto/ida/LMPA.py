@@ -159,46 +159,8 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
 from gepetto.ida.c_function import CFunction, c_func_dict
 from gepetto.ida.Prompts import chosen_func_prompt, comment_prompt
 from gepetto.ida.ida_helpers import get_format
+import networkx as nx
 
-
-def recover_function_name_args_iteratively(c_func, iterations: int):
-    if c_func.isLeaf:
-        params = [c_func.name] + c_func.arguments + c_func.variables
-        # interact with GPT
-        response = gepetto.config.model.query_model_sync(
-            _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
-        # parse response and update changes apply to itself
-        apply_changes(c_func, response)
-
-    else:
-        # need to update stopping condition, gradient descent like (till convergence)
-        while(iterations >= 0):
-            # main function from which everything starts
-            params = [c_func.name] + c_func.arguments + c_func.variables
-            # interact with GPT
-            response = gepetto.config.model.query_model_sync(
-                _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
-            # parse response and update changes apply to itself
-            apply_changes(c_func, response)
-
-
-            #secondary functions (called within the main function)
-            for called_function, args in c_func.calls.items():
-                ida_hexrays.decompile(exa_function)
-            #     params = [c_func.name] + c_func.arguments + c_func.variables
-            #     prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
-            #     comment = comment_prompt.format(function_name=called_function, variables=args)
-            #     # interact with GPT
-            #     response = gepetto.config.model.query_model_sync(comment + prompt)
-            #     print("IN SEC")
-            #     print(response)
-            # #     parse response and update changes apply to itself and to caller func
-            # apply_changes(c_func, response)
-            # update_func()
-
-
-
-            iterations-=1
 
 def apply_changes(c_func, LLM_result):
     response = json.loads(LLM_result)
@@ -227,9 +189,11 @@ def apply_changes(c_func, LLM_result):
             exa_representation = called.replace('sub_', '0x')
             print(exa_representation)
             exa_function = int(exa_representation, 16)
+            new_node = G.add_node(G.number_of_nodes()+1, data=CFunction(exa_function))
+            G.add_edge(father, new_node)
             idc.set_name(exa_function, guessed_call_name[0], idc.SN_NOWARN)
         except:
-            # if it ends here two possibilities 'sub_' not in called
+            print("problems with called functions")
             pass
     c_func.view.refresh_view(True)
     c_func.load_func()
@@ -237,7 +201,7 @@ def apply_changes(c_func, LLM_result):
 def update_func():
     pass
 
-
+from gepetto.ida.Tree import Tree
 class LMPAHandler(idaapi.action_handler_t):
     """
     This handler requests new variable names from the model and updates the
@@ -246,13 +210,58 @@ class LMPAHandler(idaapi.action_handler_t):
 
     def __init__(self):
         idaapi.action_handler_t.__init__(self)
-        self.v = ''
 
     def activate(self, ctx):
-        self.view = ida_hexrays.get_widget_vdui(ctx.widget)
-        c_func = CFunction(idaapi.get_screen_ea(), self.view)
-        recover_function_name_args_iteratively(c_func, 1)
+        self.G = Tree(idaapi.get_screen_ea(), ida_hexrays.get_widget_vdui(ctx.widget))
+        # view = ida_hexrays.get_widget_vdui(ctx.widget)
+        # c_func = CFunction(idaapi.get_screen_ea(), view)
+        self.recover_function_name_args_iteratively(1)
         return 1
+
+    def recover_function_name_args_iteratively(self, iterations: int):
+        Root = self.G.Root['data']
+        if Root.isLeaf:
+            params = [Root.name] + Root.arguments + Root.variables
+            # interact with GPT
+            response = gepetto.config.model.query_model_sync(
+                _(chosen_func_prompt).format(decompiler_output=Root.body, params=params, format=(get_format(Root))))
+            # parse response and update changes apply to itself
+            apply_changes(Root, response)
+
+        else:
+            # Build tree
+            self.G.build_tree(self.G.Root)
+            print("GRAPH")
+            print(self.G)
+            print("GRAPH")
+
+            # need to update stopping condition, gradient descent like (till convergence)
+            while (iterations >= 0):
+                # main function from which everything starts
+                params = [Root.name] + Root.arguments + Root.variables
+                # interact with GPT
+                response = gepetto.config.model.query_model_sync(
+                    _(chosen_func_prompt).format(decompiler_output=Root.body, params=params, format=(get_format(Root))))
+                # parse response and update changes apply to itself
+                apply_changes(Root, response)
+
+                # secondary functions (called within the main function)
+                for called_function, args in Root.calls.items():
+                    pass
+
+                # params = [c_func.name] + c_func.arguments + c_func.variables
+                #     prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
+                #     comment = comment_prompt.format(function_name=called_function, variables=args)
+                #     # interact with GPT
+                #     response = gepetto.config.model.query_model_sync(comment + prompt)
+                #     print("IN SEC")
+                #     print(response)
+                # #     parse response and update changes apply to itself and to caller func
+                # apply_changes(c_func, response)
+                # update_func()
+
+                iterations -= 1
+
 
     # This action is always available.
     def update(self, ctx):
