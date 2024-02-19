@@ -166,6 +166,7 @@ def apply_changes(c_func, LLM_result, node_id):
 
     # rename function
     original_func_name, guessed_func_name = next(iter(response['function name'].items()))
+    print(original_func_name, guessed_func_name)
     exa_function = int(hex(c_func.ea), 16)
     guessed_func_name = guessed_func_name[0]
     idc.set_name(exa_function, guessed_func_name, idc.SN_NOWARN)
@@ -189,11 +190,8 @@ def apply_changes(c_func, LLM_result, node_id):
         except:
             print("problems with called functions")
             pass
-    c_func.view.refresh_view(True)
     c_func.load_func()
 
-def update_func():
-    pass
 
 from gepetto.ida.Tree import Tree
 class LMPAHandler(idaapi.action_handler_t):
@@ -207,7 +205,7 @@ class LMPAHandler(idaapi.action_handler_t):
 
     def activate(self, ctx):
         self.Tree = Tree(idaapi.get_screen_ea(), ida_hexrays.get_widget_vdui(ctx.widget))
-        self.recover_function_name_args_iteratively(3)
+        self.recover_function_name_args_iteratively(2)
         return 1
 
     def recover_function_name_args_iteratively(self, iterations: int):
@@ -234,26 +232,20 @@ class LMPAHandler(idaapi.action_handler_t):
                     _(chosen_func_prompt).format(decompiler_output=Root.body, params=params, format=(get_format(Root))))
                 # parse response and update changes apply to itself
                 apply_changes(Root, response, node_id)
+                Root.view.refresh_view(True)
 
                 # sub called functions
                 for edge in self.Tree.G.edges(node_id):
                     # we have irrelevant nodes because of IDA's decompilation operation so we "jump" over them
                     relevent_node_id = self.Tree.G.out_edges(edge[1])
                     called_func_node = self.Tree.G.nodes[list(relevent_node_id)[0][1]]['data']
-                    print(called_func_node.name)
                     params = [called_func_node.name] + called_func_node.arguments + called_func_node.variables
                     prompt = _(chosen_func_prompt).format(decompiler_output=called_func_node.body, params=params, format=(get_format(called_func_node)))
-                    print("PROMPT")
-                    print(prompt)
                     comment = comment_prompt.format(function_name=Root.name, variables=Root.arguments)
-                    print("COMMENT")
-                    print(comment)
                     # interact with GPT
                     response = gepetto.config.model.query_model_sync(comment + prompt)
-                    print(response)
-                #     parse response and update changes apply to itself and to caller func
-                apply_changes(called_func_node, response)
-                update_func()
+                    # parse response and update changes apply to itself and to caller func
+                    apply_changes(called_func_node, response, node_id)
 
                 iterations -= 1
 

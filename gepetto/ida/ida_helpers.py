@@ -6,7 +6,7 @@ pre_defined_funcs = ["sub_401000", "sub_401010", "sub_401020", "sub_401060", "su
 
 
 def get_format(func: CFunction):
-    func_name = "\"function name\": {{\"\"\n{func_name}\": [\" replace with function guessed name\", \"fill_confidence_level\"]}} ".format(
+    func_name = "\"function name\": {{\"{func_name}\": [\" replace with function guessed name\", \"fill_confidence_level\"]}} ".format(
         func_name=func.name)
     func_args = {}
     for arg in func.arguments:
