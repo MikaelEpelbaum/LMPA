@@ -12,10 +12,10 @@ class CFunction:
         self.ea = effective_address
         self.view = view
         self.name = ida_funcs.get_func_name(self.ea)
-        self.arguments_address = ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).arguments
+        self.arguments_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).arguments)
         self.arguments = [arg.name for arg in self.arguments_address]
-        self.variables_address = ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).lvars
-        self.variables = [var.name for var in self.variables_address]
+        self.variables_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).lvars)
+        self.variables = [var.name for var in self.variables_address if not var.is_arg_var]
         body = str(ida_hexrays.decompile_func(ida_funcs.get_func(effective_address), None))
         self.body = rename_known_funcs(body)
         self.calls = self.get_function_calls()

@@ -156,13 +156,19 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
 
 # import ida_helpers
 from gepetto.ida.c_function import CFunction
+from gepetto.ida.Prompts import stand_alone_leaf
+from gepetto.ida.ida_helpers import get_format
 def recover_function_name_args_iterativelly(c_func: CFunction, iteration: int):
     if iteration <= 0:
         return
     if c_func.isLeaf:
-        pass
+        params = [c_func.name] + c_func.arguments + c_func.variables
+        # interact with GPT
+        response = gepetto.config.model.query_model_sync(
+            _(stand_alone_leaf).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
+    #     parse response and update changes
     else:
-        pass
+
 
 
 

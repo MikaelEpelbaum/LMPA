@@ -32,21 +32,17 @@ def rename_known_funcs(decompiled: str):
     return new_code
 
 
-def get_filled_format(func: ):
-    # func_name = "\"function name\": {{\"\"\n{func_name}\": [\" replace with function guessed name\", \"fill_confidence_level\"]\"}} ".format(func_name=params['func_name'])
+def get_format(func: CFunction):
     func_name = "\"function name\": {{\"\"\n{func_name}\": [\" replace with function guessed name\", \"fill_confidence_level\"]}} ".format(
-        func_name=params['func_name'])
-
+        func_name=func.name)
     func_args = {}
-    for arg in params['func_args']:
+    for arg in func.arguments:
         func_args[arg] = "[\"replace with argument guessed name\", \"fill_confidence_level\"]"
     func_vars = {}
-    for var in params['local_vars']:
+    for var in func.variables:
         func_vars[var] = "[\"replace with local variable guessed name\", \"fill_confidence_level\"]"
     func_calls = {}
-    for call in params['function_calls']:
-        if call in Helper.c_func_dict.keys():
-            continue
+    for call in func.calls:
         func_calls[call] = "[\"replace with called function guessed name\", \"fill_confidence_level\"]"
 
     unwrapped = " {}, \"function arguments\": {}, \"function variables\": {}, \"function calls\": {}".format(
