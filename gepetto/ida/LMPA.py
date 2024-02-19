@@ -154,22 +154,39 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
     # interact with GPT
     gepetto.config.model.query_model_async(prompts, functools.partial(chosen_function_inferer_using_LLM, chosen_func_body, called_funcs, view, c-1))
 
+
 # import ida_helpers
 from gepetto.ida.c_function import CFunction
-from gepetto.ida.Prompts import stand_alone_leaf
+from gepetto.ida.Prompts import chosen_func_prompt
 from gepetto.ida.ida_helpers import get_format
-def recover_function_name_args_iterativelly(c_func: CFunction, iteration: int):
-    if iteration <= 0:
-        return
+
+
+def recover_function_name_args_iteratively(c_func: CFunction, iterations: int):
     if c_func.isLeaf:
         params = [c_func.name] + c_func.arguments + c_func.variables
         # interact with GPT
         response = gepetto.config.model.query_model_sync(
-            _(stand_alone_leaf).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
+            _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
     #     parse response and update changes
     else:
+        # need to update stopping condition, gradient descent like (till convergence)
+        initial_flag = True
+        while(iterations >= 0):
+            if initial_flag:
+                params = [c_func.name] + c_func.arguments + c_func.variables
+                # interact with GPT
+                response = gepetto.config.model.query_model_sync(
+                    _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
+            else:
+                
+                params = [c_func.name] + c_func.arguments + c_func.variables
+                # interact with GPT
+                response = gepetto.config.model.query_model_sync(
+                    _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
 
 
+
+            iterations-=1
 
 
 
@@ -186,7 +203,7 @@ class LMPAHandler(idaapi.action_handler_t):
     def activate(self, ctx):
         self.view = ida_hexrays.get_widget_vdui(ctx.widget)
         c_func = CFunction(idaapi.get_screen_ea(), self.view)
-        recover_function_name_args_iterativelly(c_func, 4)
+        recover_function_name_args_iteratively(c_func, 4)
         return 1
 
     # This action is always available.
