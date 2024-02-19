@@ -54,7 +54,8 @@ class CFunction:
     @staticmethod
     def find_function_calls_with_args(body):
         # Regular expression pattern to match function calls and their arguments
-        pattern = r'(\b[a-zA-Z_]\w*)\s*\(([^)]*)\);'
+        # pattern = r'(\b[a-zA-Z_]\w*)\s*\(([^)]*)\);'
+        pattern = r'(\b[a-zA-Z_]\w*)\s*\(\s*([^)]*)\s*\);'
 
         # Find all matches using re.findall()
         matches = re.findall(pattern, body)
@@ -70,6 +71,5 @@ class CFunction:
             arguments = [arg.strip() for arg in arguments]
             if str(function_name).startswith('sub_'):
                 function_calls_with_args[function_name] = arguments
-
         return function_calls_with_args
 
