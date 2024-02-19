@@ -23,9 +23,9 @@ class CFunction:
 
     def load_func(self):
         self.name = ida_funcs.get_func_name(self.ea)
-        self.arguments_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).arguments)
+        self.arguments_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(self.ea), None).arguments)
         self.arguments = [arg.name for arg in self.arguments_address]
-        self.variables_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(idaapi.get_screen_ea()), None).lvars)
+        self.variables_address = list(ida_hexrays.decompile_func(ida_funcs.get_func(self.ea), None).lvars)
         self.variables = [var.name for var in self.variables_address if not var.is_arg_var]
         self.body = str(ida_hexrays.decompile_func(ida_funcs.get_func(self.ea), None))
         self.calls = self.find_function_calls_with_args(self.body)

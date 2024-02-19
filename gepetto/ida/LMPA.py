@@ -235,23 +235,25 @@ class LMPAHandler(idaapi.action_handler_t):
                 # parse response and update changes apply to itself
                 apply_changes(Root, response, node_id)
 
-
                 # sub called functions
                 for edge in self.Tree.G.edges(node_id):
                     # we have irrelevant nodes because of IDA's decompilation operation so we "jump" over them
-                    relevent_node_id = self.Tree.G.edges(edge[1])
-                    called_func_node = self.Tree.G.nodes()[relevent_node_id]['data']
+                    relevent_node_id = self.Tree.G.out_edges(edge[1])
+                    called_func_node = self.Tree.G.nodes[list(relevent_node_id)[0][1]]['data']
                     print(called_func_node.name)
                     params = [called_func_node.name] + called_func_node.arguments + called_func_node.variables
                     prompt = _(chosen_func_prompt).format(decompiler_output=called_func_node.body, params=params, format=(get_format(called_func_node)))
+                    print("PROMPT")
+                    print(prompt)
                     comment = comment_prompt.format(function_name=Root.name, variables=Root.arguments)
+                    print("COMMENT")
+                    print(comment)
                     # interact with GPT
                     response = gepetto.config.model.query_model_sync(comment + prompt)
-                    print("IN SEC")
-                #     print(response)
-                # #     parse response and update changes apply to itself and to caller func
-                # apply_changes(c_func, response)
-                # update_func()
+                    print(response)
+                #     parse response and update changes apply to itself and to caller func
+                apply_changes(called_func_node, response)
+                update_func()
 
                 iterations -= 1
 
