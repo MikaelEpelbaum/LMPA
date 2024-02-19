@@ -6,4 +6,4 @@ chosen_func_prompt = "Can you help me guess some information for the following d
         " DON'T INCLUDE CHANGES OF VARIABLES CONVENTIONAL NAMINGS" \
         " keep only high level confidence levels. RETURN ONLY MEANINGFUL CHANGES"
 
-comment_prompt = "/* Called in \n{function_name} with input: {variables} */"
+comment_prompt = "/* Called in \n{function_name} with input: {variables} */ "

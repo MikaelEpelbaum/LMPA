@@ -157,7 +157,7 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
 
 # import ida_helpers
 from gepetto.ida.c_function import CFunction
-from gepetto.ida.Prompts import chosen_func_prompt
+from gepetto.ida.Prompts import chosen_func_prompt, comment_prompt
 from gepetto.ida.ida_helpers import get_format
 
 
@@ -170,19 +170,21 @@ def recover_function_name_args_iteratively(c_func: CFunction, iterations: int):
     #     parse response and update changes
     else:
         # need to update stopping condition, gradient descent like (till convergence)
-        initial_flag = True
         while(iterations >= 0):
-            if initial_flag:
-                params = [c_func.name] + c_func.arguments + c_func.variables
+            # main function
+            params = [c_func.name] + c_func.arguments + c_func.variables
+            # interact with GPT
+            response = gepetto.config.model.query_model_sync(
+                _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
+
+
+            #secondary functions
+            params = [c_func.name] + c_func.arguments + c_func.variables
+            prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
+            for called_function, args in c_func.calls.items():
+                comment = comment_prompt.format(function_name=called_function, variables=args)
                 # interact with GPT
-                response = gepetto.config.model.query_model_sync(
-                    _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
-            else:
-                
-                params = [c_func.name] + c_func.arguments + c_func.variables
-                # interact with GPT
-                response = gepetto.config.model.query_model_sync(
-                    _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func))))
+                response = gepetto.config.model.query_model_sync(comment + prompt)
 
 
 
