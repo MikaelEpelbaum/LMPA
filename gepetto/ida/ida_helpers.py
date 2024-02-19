@@ -1,10 +1,5 @@
 from gepetto.ida.c_function import CFunction
 
-
-c_func_dict = {"sub_4110DC": "printf", "sub_401020": "printf", "printf": "printf",
-                   "sub_401060": "scanf_s", "sub_41129E": "scanf_s",
-                   "for": "for", "while": "while", "__CheckForDebuggerJustMyCode": "__CheckForDebuggerJustMyCode"}
-
 pre_defined_funcs = ["sub_401000", "sub_401010", "sub_401020", "sub_401060", "sub_401219", "sub_401221", "sub_4017CD",
                      "sub_4017D7", "sub_4017E3", "sub_401827", "sub_401833", "sub_401839", "sub_40195F", "sub_4019A1",
                      "sub_401A03", "sub_401A0B", "sub_401A37", "sub_401AE4"]

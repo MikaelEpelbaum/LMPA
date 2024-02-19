@@ -4,7 +4,10 @@ import ida_funcs
 import idaapi
 import idc
 import re
-from gepetto.ida.ida_helpers import c_func_dict
+
+c_func_dict = {"sub_4110DC": "printf", "sub_401020": "printf", "printf": "printf",
+                   "sub_401060": "scanf_s", "sub_41129E": "scanf_s",
+                   "for": "for", "while": "while", "__CheckForDebuggerJustMyCode": "__CheckForDebuggerJustMyCode"}
 
 
 class CFunction:

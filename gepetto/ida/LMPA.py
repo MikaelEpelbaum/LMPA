@@ -156,7 +156,7 @@ def called_functions_inferrer(called_funcs: dict, chosen_func_body, view, c, res
 
 
 # import ida_helpers
-# from gepetto.ida.c_function import CFunction
+from gepetto.ida.c_function import CFunction
 from gepetto.ida.Prompts import chosen_func_prompt, comment_prompt
 from gepetto.ida.ida_helpers import get_format
 
@@ -173,7 +173,7 @@ def recover_function_name_args_iteratively(c_func, iterations: int):
     else:
         # need to update stopping condition, gradient descent like (till convergence)
         while(iterations >= 0):
-            # main function
+            # main function from which everything starts
             params = [c_func.name] + c_func.arguments + c_func.variables
             # interact with GPT
             response = gepetto.config.model.query_model_sync(
@@ -182,8 +182,7 @@ def recover_function_name_args_iteratively(c_func, iterations: int):
             apply_changes(c_func, response)
 
 
-
-            #secondary functions
+            #secondary functions (called within the main function)
             for called_function, args in c_func.calls.items():
                 params = [c_func.name] + c_func.arguments + c_func.variables
                 prompt = _(chosen_func_prompt).format(decompiler_output=c_func.body, params=params, format=(get_format(c_func)))
@@ -200,21 +199,24 @@ def recover_function_name_args_iteratively(c_func, iterations: int):
 
 def apply_changes(c_func, LLM_result):
     response = json.loads(LLM_result)
-    for func_res in response:
-        original_func_name, guessed_func_name = next(iter(func_res['function name'].items()))
-        exa_representation = original_func_name.replace('sub_', '0x')
-        exa_function = int(exa_representation, 16)
-        guessed_func_name = guessed_func_name[0]
-        idc.set_name(exa_function, guessed_func_name, idc.SN_NOWARN)
-        # update args and vars names
-        args_iterator = iter(func_res['function arguments'].items())
-        for arg in args_iterator:
-            original_arg_name, guessed_arg_name = arg
-            ida_hexrays.rename_lvar(exa_function, original_arg_name, guessed_arg_name[0])
-        vars_iterator = iter(func_res['function variables'].items())
-        for var in vars_iterator:
-            original_var_name, guessed_var_name = var
-            ida_hexrays.rename_lvar(exa_function, original_var_name, guessed_var_name[0])
+    # print(LLM_result)
+    # for func_res in response:
+    original_func_name, guessed_func_name = next(iter(response['function name'].items()))
+    exa_function = int(hex(c_func.ea), 16)
+    # exa_representation = original_func_name.replace('sub_', '0x')
+    # exa_function = int(exa_representation, 16)
+    guessed_func_name = guessed_func_name[0]
+    idc.set_name(exa_function, guessed_func_name, idc.SN_NOWARN)
+    # update args and vars names
+    args_iterator = iter(response['function arguments'].items())
+    for arg in args_iterator:
+        original_arg_name, guessed_arg_name = arg
+        ida_hexrays.rename_lvar(exa_function, original_arg_name, guessed_arg_name[0])
+    vars_iterator = iter(response['function variables'].items())
+    for var in vars_iterator:
+        original_var_name, guessed_var_name = var
+        ida_hexrays.rename_lvar(exa_function, original_var_name, guessed_var_name[0])
+    c_func.view.refresh_view(True)
 
 def update_func():
     pass
